@@ -1,0 +1,6 @@
+node_modules
+build
+config.json
+npm-debug.log
+err.log
+out.log
