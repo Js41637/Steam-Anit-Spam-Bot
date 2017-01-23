@@ -9,7 +9,7 @@ const client = new SteamUser(username, password)
 
 var SESSIONID = undefined
 var COOKIES = undefined
-const commentCount = 30 // how many comments to load
+const commentCount = 100 // how many comments to load
 const endpoints = {
   comments: `https://steamcommunity.com/comment/Clan/render/%i/-1?count=${commentCount}`,
   delete: 'https://steamcommunity.com/comment/Clan/delete/%i/-1',
@@ -95,5 +95,5 @@ const banQueue = async.queue(({ userID, groupID, commentID }, cb) => {
 
   setTimeout(() => {
     cb()
-  }, 2000); // Ban user every 2 seconds incase of limits
+  }, 1000); // Ban user every 1 second incase of limits
 }, 1)
