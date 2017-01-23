@@ -9,7 +9,7 @@ const client = new SteamUser(username, password)
 
 var SESSIONID = undefined
 var COOKIES = undefined
-const commentCount = 100 // how many comments to load
+const commentCount = 30 // how many comments to load
 const endpoints = {
   comments: `https://steamcommunity.com/comment/Clan/render/%i/-1?count=${commentCount}`,
   delete: 'https://steamcommunity.com/comment/Clan/delete/%i/-1',
