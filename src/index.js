@@ -1,5 +1,5 @@
 import cheerio from 'cheerio'
-import needle from 'needle'
+import request from 'request'
 import async from 'async'
 import SteamUser from './steam'
 import { username, password, groups } from "../config.json"
@@ -7,80 +7,93 @@ import spamFilter from '../spamFilter'
 
 const client = new SteamUser(username, password)
 
-var sessionid = undefined;
+var SESSIONID = undefined
+var COOKIES = undefined
 const commentCount = 30 // how many comments to load
 const endpoints = {
   comments: `https://steamcommunity.com/comment/Clan/render/%i/-1?count=${commentCount}`,
   delete: 'https://steamcommunity.com/comment/Clan/delete/%i/-1',
-  ban: 'https://steamcommunity.com/gid/%i/banuser/?ajax=1'
+  ban: 'https://steamcommunity.com/gid/%i/banuser/'
 }
 
+const getURL = (type, id) => endpoints[type].replace('%i', id)
+
 // This event gets fired every 2 hours to make sure our sessionID is still valid so it also fires the spam check
-client.on('sessionID', session => {
-  if (!session) return console.error("No sessionID?")
-  sessionid = session
+client.on('sessionID', ({ sessionID, cookies }) => {
+  if (!sessionID) return console.error("No sessionID?")
+  SESSIONID = sessionID
+  COOKIES = cookies
   checkGroupsCommentsForSpam()
 })
 
 // Goes through each group loading comments and checking for spammmmmm
 function checkGroupsCommentsForSpam() {
   async.each(groups, (group, cb) => {
-    makeRequest('comments', group.id).then(data => {
-      if (!data || !data.comments_html) return console.error("Error: Invalid data")
-      var $ = cheerio.load(data.comments_html)
+    request.get(getURL('comments', group.id), { json: true }, (err, resp, body) => {
+      if (!body || !body.comments_html) return console.error("Error: Invalid body")
+      var $ = cheerio.load(body.comments_html)
       var usersToBan = []
       var comments = $('.commentthread_comment')
       comments.each((index, comment) => {
         comment = $(comment)
+        let commentID = comment.attr('id').replace('comment_', '')
         let userID = comment.find('.commentthread_author_link').attr('data-miniprofile')
         let text = comment.find('.commentthread_comment_text').text().trim()
         if (spamFilter.some(word => text.includes(word)) && !usersToBan.includes(userID)) {
           usersToBan.push(userID)
-          banUser(userID, group.id)
+          banUser(userID, group.id, commentID)
         }
       })
       console.log(`Found ${usersToBan.length} users to ban in group: ${group.name}`, usersToBan)
-      cb()
-    }).catch(err => {
-      console.error("Error fetching comment data", err)
       cb()
     })
   })
 }
 
 // Adds a user to the queue to be banned
-function banUser(userID, groupID) {
-  banQueue.push({ userID, groupID })
+function banUser(userID, groupID, commentID) {
+  banQueue.push({ userID, groupID, commentID })
 }
 
 // Bans 1 user at a time every 5 seconds
-const banQueue = async.queue(({ userID, groupID }, cb) => {
-  makeRequest('ban', groupID, {
-    gidforum: -1,
-    gidtopic: -1,
-    target: userID,
-    ban_length: 0,
-    ban_reason: 'Spam Detection',
-    deletecomments: 'on'
-  }).then(resp => {
-    if (resp.success) {
-      if (resp.success == 1) console.log("Succesfully banned user")
-      else console.log("Didn't get success:1 response, ban probably failed!")
-    } else console.log("Got response but no success response!")
-    setTimeout(() => {
-      cb()
-    }, 5000); // Ban user every 5 seconds incase of limits
-  }).catch(err => {
-    console.error("Error banning user:", err)
-  })
-}, 1)
+const banQueue = async.queue(({ userID, groupID, commentID }, cb) => {
+  var options = {
+    method: 'POST',
+    url: getURL('ban', groupID),
+    qs: { ajax: '1' },
+    headers: { cookie: COOKIES.join(';'), 'content-type': 'application/x-www-form-urlencoded' },
+    form: {
+      gidforum: '-1',
+      gidtopic: '-1',
+      gidcomment: commentID,
+      target: userID,
+      sessionid: SESSIONID,
+      ban_length: '0',
+      ban_reason: 'Spam Detection',
+      deletecomments: 'on'
+    }
+  }
 
-// Helper function to make requests, automatically generating URL and adding sessionid
-function makeRequest(type, id, options = {}) {
-  return new Promise((resolve, reject) => {
-    needle.post(endpoints[type].replace('%i', id), Object.assign({}, { sessionid }, options), (err, resp, body) => {
-      if (err || !body || !body.success) return reject(err || body)
-      return resolve(body)
-    })
+  request(options, (err, resp) => {
+    if (!err) {
+      switch (resp.statusCode) {
+        case 200:
+          return console.log("Succesfully banned user", userID)
+        case 400:
+          return console.log("Error, user already banned", userID)
+        case 403:
+          return console.error("Error banning user, invalid sessionID")
+        case 404:
+          return console.error("Error banning using, incorrect url?")
+        default:
+          return console.log('Got unknown status code'. resp.statusCode)
+      }
+    } else {
+      console.error("Error banning user", userID)
+    }
   })
-}
+
+  setTimeout(() => {
+    cb()
+  }, 2000); // Ban user every 2 seconds incase of limits
+}, 1)

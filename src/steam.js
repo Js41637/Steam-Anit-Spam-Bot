@@ -10,8 +10,8 @@ export default class Steam extends SteamUser {
       this.gamesPlayed([753, "Steam"]) // Idle in steam app for lolz
     })
 
-    this.on('webSession', sessionID => {
-      this.emit('sessionID', sessionID)
+    this.on('webSession', (sessionID, cookies) => {
+      this.emit('sessionID', {sessionID, cookies})
     })
 
     this.on('error', e => {
