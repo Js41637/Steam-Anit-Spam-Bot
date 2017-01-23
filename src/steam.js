@@ -2,12 +2,12 @@ import SteamUser from 'steam-user'
 
 export default class Steam extends SteamUser {
   constructor(accountName, password) {
-    super()
+    super() // SUPER~~~~
 
     this.on('loggedOn', () => {
       console.log("Logged into Steam as " + this.steamID.getSteam3RenderedID())
       this.setPersona(SteamUser.EPersonaState.Online)
-      this.gamesPlayed([753, "Steam"])
+      this.gamesPlayed([753, "Steam"]) // Idle in steam app for lolz
     })
 
     this.on('webSession', sessionID => {

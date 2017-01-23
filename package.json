@@ -41,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/js41637/Steam-AntiSpam-Bot.git"
+    "url": "https://github.com/js41637/Steam-Anti-Spam-Bot.git"
   },
   "engines": {
     "node": ">= 6.0.0"
