@@ -15,7 +15,7 @@
   },
   "betterScripts": {
     "start-dev": {
-      "command": "node -r babel-register ./index.js",
+      "command": "node -r babel-register ./spamtracker.js",
       "env": {
         "NODE_ENV": "development"
       }
@@ -33,7 +33,7 @@
       }
     },
     "forever": {
-      "command": "forever start -a -o out.log -e err.log -m 1 index.js",
+      "command": "forever start -a -o out.log -e err.log -m 1 spamtracker.js",
       "env": {
         "NODE_ENV": "production"
       }
@@ -46,7 +46,7 @@
   "engines": {
     "node": ">= 6.0.0"
   },
-  "main": "build/main.js",
+  "main": "build/index.js",
   "license": "Beerware",
   "dependencies": {
     "async": "^2.1.4",
