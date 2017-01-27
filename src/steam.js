@@ -22,6 +22,6 @@ export default class Steam extends SteamUser {
 
     setInterval(() => {
       this.webLogOn()
-    }, 1000 * 60 * 60 * 2); // Update sessionID every 2 hours
+    }, 1000 * 60 * 60 * 1); // Update sessionID every 1 hour
   }
 }
