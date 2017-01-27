@@ -30,7 +30,7 @@ client.on('sessionID', ({ sessionID, cookies }) => {
 function checkGroupsCommentsForSpam() {
   async.each(groups, (group, cb) => {
     request.get(getURL('comments', group.id), { json: true }, (err, resp, body) => {
-      if (!body || !body.comments_html) return console.error("Error: Invalid body")
+      if (!body || !body.comments_html) return console.error("Error: Invalid body", err, body)
       var $ = cheerio.load(body.comments_html)
       var usersToBan = []
       var comments = $('.commentthread_comment')
