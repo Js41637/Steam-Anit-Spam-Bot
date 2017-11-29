@@ -54,7 +54,7 @@ const extractTopicTitle = body =>{
 }
 
 const extractOPId = body => {
-  const _id = body.split('forum_op_author " href="http://steamcommunity.com/profiles/')
+  const _id = body.split('forum_op_author " href="https://steamcommunity.com/profiles/')
   return _id[1] && _id[1].split('"')[0]
 }
 
@@ -74,11 +74,11 @@ const checkGroupsCommentsForSpam = () => {
             topicTitle
           })
           if (spamFilter.some(word => topicTitle && topicTitle.includes(word))){
-            console.log("^^^ SPAM DETECTED !!")
             const _id = extractOPId(body_)
+            console.log("^^^ SPAM DETECTED !!", {_id})
             //userIDs.push(_id)
             if (_id){ // won t get an id on group moderators / admins
-              banUser(_id, 4581246, topicURL)
+              banUser(_id, group.id, topicURL)
             }
           }
         })
