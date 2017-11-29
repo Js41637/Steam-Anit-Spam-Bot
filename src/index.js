@@ -1,4 +1,3 @@
-import cheerio from 'cheerio'
 import request from 'request'
 import async from 'async'
 import SteamUser from './steam'
@@ -9,12 +8,13 @@ const client = new SteamUser(username, password)
 
 var SESSIONID = undefined
 var COOKIES = undefined
-const commentCount = 30 // how many comments to load
 const endpoints = {
-  comments: `https://steamcommunity.com/comment/Clan/render/%i/-1?count=${commentCount}`,
+  comments: 'https://steamcommunity.com/groups/%i/discussions/0/',
   delete: 'https://steamcommunity.com/comment/Clan/delete/%i/-1',
   ban: 'https://steamcommunity.com/gid/%i/banuser/'
 }
+
+const NB_COMMENTS_TO_SKIP = 8
 
 const getURL = (type, id) => endpoints[type].replace('%i', id)
 
@@ -23,30 +23,71 @@ client.on('sessionID', ({ sessionID, cookies }) => {
   if (!sessionID) return console.error("No sessionID?")
   SESSIONID = sessionID
   COOKIES = cookies
-  checkGroupsCommentsForSpam()
 })
 
+client.on('newComments', ()=>{
+
+  checkGroupsCommentsForSpam()
+})
 // Goes through each group loading comments and checking for spammmmmm
-function checkGroupsCommentsForSpam() {
+
+const extractTopics = body =>
+  body.split('<div class="forum_topic_name ">')
+    .map((elem, i) => (i > NB_COMMENTS_TO_SKIP)
+        && elem.split('</div>')[0].trim())
+    .filter(x=>x);
+
+const extractTopicOPs = body =>
+  body.split('<div class="forum_topic_op">')
+    .map((elem, i) => (i > NB_COMMENTS_TO_SKIP)
+        && elem.split('</div>')[0].trim()).filter(x=>x);
+
+const extractTopicURLs = body =>
+  body.split('data-gidforumtopic="')
+    .map((elem, i) => (i > NB_COMMENTS_TO_SKIP)
+        && elem.split('" data-tooltip-content')[0].trim())
+    .filter(x=>x);
+
+const extractTopicTitle = body =>{
+  const topic = body.split('<div class="topic">')[1]
+  return topic && topic.split("</div>")[0]
+}
+
+const extractOPId = body => {
+  const _id = body.split('forum_op_author " href="https://steamcommunity.com/profiles/')
+  return _id[1] && _id[1].split('"')[0]
+}
+
+const checkGroupsCommentsForSpam = () => {
+
   async.each(groups, (group, cb) => {
-    request.get(getURL('comments', group.id), { json: true }, (err, resp, body) => {
-      if (!body || !body.comments_html) return console.error("Error: Invalid body", err, body)
-      var $ = cheerio.load(body.comments_html)
-      var usersToBan = []
-      var comments = $('.commentthread_comment')
-      comments.each((index, comment) => {
-        comment = $(comment)
-        let commentID = comment.attr('id').replace('comment_', '')
-        let userID = comment.find('.commentthread_author_link').attr('data-miniprofile')
-        let text = comment.find('.commentthread_comment_text').text().trim()
-        if (spamFilter.some(word => text.includes(word)) && !usersToBan.includes(userID)) {
-          usersToBan.push(userID)
-          banUser(userID, group.id, commentID)
-        }
+    const commentsURL = getURL('comments', group.name)
+    request.get(commentsURL, {}, (err, resp, body)=>{
+      const topics = extractTopics(body);
+      const topicsOPs = extractTopicOPs(body);
+      const topicsURL = extractTopicURLs(body)
+      topicsURL.forEach((topicURL) => {
+        request.get(commentsURL + topicURL, {}, (err, resp, body_)=>{
+          const topicTitle = extractTopicTitle(body_)
+          console.log({
+            URL: commentsURL + topicURL,
+            topicTitle
+          })
+          if (spamFilter.some(word => topicTitle && topicTitle.includes(word))){
+            const _id = extractOPId(body_)
+            console.log("^^^ SPAM DETECTED !!", {_id})
+            //userIDs.push(_id)
+            if (_id){ // won t get an id on group moderators / admins
+              banUser(_id, group.id, topicURL)
+            }
+          }
+        })
       })
-      console.log(`Found ${usersToBan.length} users to ban in group: ${group.name}`, usersToBan)
-      cb()
+      console.log(topics)
+      console.log(topicsURL)
+      console.log(topicsOPs)
     })
+  cb()
   })
 }
 
